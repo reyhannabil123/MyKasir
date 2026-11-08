@@ -5,8 +5,10 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: { default: "MyKasir", template: "%s · MyKasir" },
   description: "Kasir sederhana untuk warung, kafe, dan UMKM.",
+  icons: { icon: "/icon-192.png", apple: "/apple-touch-icon.png" },
+  appleWebApp: { capable: true, title: "MyKasir", statusBarStyle: "default" },
 };
-export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover" };
+export const viewport: Viewport = { themeColor: "#0C7A64", width: "device-width", initialScale: 1, viewportFit: "cover" };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const theme = (await cookies()).get("mk-theme")?.value;
