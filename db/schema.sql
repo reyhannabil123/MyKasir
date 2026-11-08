@@ -134,3 +134,15 @@ CREATE INDEX "expenses_user_idx" ON "expenses" USING btree ("user_id","created_a
 CREATE INDEX "menu_items_user_idx" ON "menu_items" USING btree ("user_id");
 CREATE INDEX "orders_user_created_idx" ON "orders" USING btree ("user_id","created_at");
 CREATE INDEX "variant_groups_user_idx" ON "variant_groups" USING btree ("user_id");
+CREATE TABLE IF NOT EXISTS "password_resets" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"user_id" uuid NOT NULL,
+	"token_hash" text NOT NULL UNIQUE,
+	"expires_at" timestamp with time zone NOT NULL,
+	"used_at" timestamp with time zone,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+DO $$ BEGIN
+ ALTER TABLE "password_resets" ADD CONSTRAINT "password_resets_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null; END $$;
+CREATE INDEX IF NOT EXISTS "password_resets_user_idx" ON "password_resets" USING btree ("user_id");

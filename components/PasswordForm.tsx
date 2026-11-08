@@ -9,7 +9,6 @@ export function PasswordForm() {
   return (
     <form action={action} className="card form" key={state.ok ? "done" : "form"}>
       <h3>Ganti kata sandi</h3>
-      <label className="f"><span>Kata sandi lama</span><input className="in" name="current" type="password" autoComplete="current-password" required /></label>
       <label className="f"><span>Kata sandi baru</span><input className="in" name="next" type="password" minLength={6} autoComplete="new-password" required /></label>
       <label className="f"><span>Ulangi kata sandi baru</span><input className="in" name="again" type="password" minLength={6} autoComplete="new-password" required /></label>
       {state.error && <p className="err" role="alert">{state.error}</p>}

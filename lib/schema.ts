@@ -130,3 +130,13 @@ export const cashClosings = pgTable("cash_closings", {
   countedCash: integer("counted_cash").notNull(),
   createdAt: createdAt(),
 });
+
+/** Token sekali pakai untuk reset kata sandi lewat email (disimpan sebagai hash). */
+export const passwordResets = pgTable("password_resets", {
+  id: id(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  tokenHash: text("token_hash").notNull().unique(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  usedAt: timestamp("used_at", { withTimezone: true }),
+  createdAt: createdAt(),
+}, (t) => [index("password_resets_user_idx").on(t.userId)]);
