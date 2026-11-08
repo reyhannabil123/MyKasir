@@ -10,11 +10,13 @@ import { OrderList } from "@/components/OrderList";
 export default async function Home() {
   const u = await requireUser();
   const since = startOfTodayWIB();
-  const [paid] = await db().select({ n: count(), total: sum(orders.total) }).from(orders)
-    .where(and(eq(orders.userId, u.id), eq(orders.status, "paid"), gte(orders.paidAt, since)));
-  const [unpaid] = await db().select({ n: count(), total: sum(orders.total) }).from(orders)
-    .where(and(eq(orders.userId, u.id), eq(orders.status, "unpaid")));
-  const recent = await loadOrderRows(u.id, { limit: 5 });
+  const [[paid], [unpaid], recent] = await Promise.all([
+    db().select({ n: count(), total: sum(orders.total) }).from(orders)
+    .where(and(eq(orders.userId, u.id), eq(orders.status, "paid"), gte(orders.paidAt, since))),
+    db().select({ n: count(), total: sum(orders.total) }).from(orders)
+      .where(and(eq(orders.userId, u.id), eq(orders.status, "unpaid"))),
+    loadOrderRows(u.id, { limit: 5 }),
+  ]);
 
   const h = Number(new Intl.DateTimeFormat("en-GB", { hour: "numeric", hour12: false, timeZone: "Asia/Jakarta" }).format(new Date()));
   const sapa = h < 11 ? "pagi" : h < 15 ? "siang" : h < 18 ? "sore" : "malam";

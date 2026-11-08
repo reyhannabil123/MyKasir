@@ -237,3 +237,8 @@ textarea.in{padding:10px 12px;min-height:64px;resize:vertical}
 .tbl .r{text-align:right}
 .vgroup{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 14px}
 
+
+/* ---- loading ---- */
+.skel{border-radius:14px;background:linear-gradient(90deg,var(--surface2),var(--surface),var(--surface2));background-size:200% 100%;animation:skel 1.2s ease-in-out infinite}
+@keyframes skel{0%{background-position:200% 0}100%{background-position:-200% 0}}
+@media (prefers-reduced-motion:reduce){.skel{animation:none}}

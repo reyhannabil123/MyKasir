@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { SignJWT, jwtVerify } from "jose";
@@ -33,7 +34,7 @@ export async function destroySession() {
   (await cookies()).delete(COOKIE);
 }
 
-async function sessionUserId(): Promise<string | null> {
+export async function sessionUserId(): Promise<string | null> {
   const token = (await cookies()).get(COOKIE)?.value;
   if (!token) return null;
   try {
@@ -44,12 +45,13 @@ async function sessionUserId(): Promise<string | null> {
   }
 }
 
-export async function getUser() {
+/** Di-cache per permintaan: layout dan halaman memakai satu kali query saja. */
+export const getUser = cache(async () => {
   const uid = await sessionUserId();
   if (!uid) return null;
   const [u] = await db().select().from(users).where(eq(users.id, uid)).limit(1);
   return u ?? null;
-}
+});
 
 /** Dipakai di halaman dan server action yang butuh login. */
 export async function requireUser() {
