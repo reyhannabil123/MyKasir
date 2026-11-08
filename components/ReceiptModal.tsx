@@ -12,10 +12,14 @@ import type { ReceiptDTO } from "@/lib/types";
 import { Modal } from "./Modal";
 import { Receipt } from "./Receipt";
 import { Icon } from "./Icon";
+import { escposReceipt, toBase64 } from "@/lib/escpos";
+import { btSupported, printBluetooth } from "@/lib/bt-print";
 
 export function ReceiptModal({ orderId, title, onClose }: { orderId: string; title?: string; onClose: () => void }) {
   const [r, setR] = useState<ReceiptDTO | null | undefined>(undefined);
   const [copied, setCopied] = useState("");
+  const [btMsg, setBtMsg] = useState("");
+  const [btBusy, setBtBusy] = useState(false);
   const [pageH, setPageH] = useState(0); // tinggi kertas (mm), diukur sebelum mencetak
   useEffect(() => {
     let alive = true;
@@ -49,6 +53,15 @@ export function ReceiptModal({ orderId, title, onClose }: { orderId: string; tit
     setTimeout(() => window.print(), 120);
   }
 
+  async function printBt() {
+    if (!r) return;
+    setBtBusy(true); setBtMsg("");
+    try { await printBluetooth(escposReceipt(r)); setBtMsg("Struk dikirim ke printer."); }
+    catch (e) { setBtMsg(e instanceof Error ? e.message : "Gagal mencetak."); }
+    setBtBusy(false);
+  }
+  const rawbtHref = r ? `intent:base64,${toBase64(escposReceipt(r))}#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;` : "#";
+
   const side = r ? Math.max(0, (r.paperWidth - (PRINTABLE[r.paperWidth] ?? 48)) / 2) : 0;
   return (
     <Modal title={title ?? (r ? `Struk #${pad(r.number)}` : "Struk")} onClose={onClose}>
@@ -63,9 +76,14 @@ export function ReceiptModal({ orderId, title, onClose }: { orderId: string; tit
             <button className="btn grow" onClick={printNow}><Icon n="printer" /> Cetak struk</button>
             <a className="btn ghost grow" target="_blank" rel="noopener noreferrer" href={`https://wa.me/?text=${encodeURIComponent(receiptText(r))}`}>Kirim lewat WhatsApp</a>
           </div>
+          <div className="row">
+            {btSupported() && <button className="btn grow" disabled={btBusy} onClick={printBt}><Icon n="printer" /> {btBusy ? "Mengirim…" : "Cetak Bluetooth"}</button>}
+            <a className="btn outl grow" href={rawbtHref}>Cetak via RawBT</a>
+          </div>
+          {btMsg && <p className="notice" role="status">{btMsg}</p>}
           <button className="btn outl block" onClick={copy}>Salin teks struk</button>
           {copied && <p className="okmsg" role="status">{copied}</p>}
-          <p className="hint">Untuk printer thermal Bluetooth, pilih printernya di jendela cetak. Lebar kertas diatur di Pengaturan ({r.paperWidth} mm).</p>
+          <p className="hint"><b>Cetak Bluetooth</b> langsung ke printer (butuh Chrome dan printer Bluetooth jenis BLE). <b>Cetak via RawBT</b> untuk printer Bluetooth biasa lewat aplikasi RawBT. Lebar kertas diatur di Pengaturan ({r.paperWidth} mm).</p>
         </>
       )}
     </Modal>
