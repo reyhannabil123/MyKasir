@@ -30,6 +30,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
         </label>
         {state.error && <p className="err" role="alert">{state.error}</p>}
         <Submit className="btn block">{su ? "Daftar" : "Masuk"}</Submit>
+        {!su && <Link className="small center muted" href="/lupa-password">Lupa kata sandi?</Link>}
       </form>
       <p className="small center">
         {su ? "Sudah punya akun?" : "Belum punya akun?"}{" "}
