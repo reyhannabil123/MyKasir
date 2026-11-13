@@ -78,3 +78,12 @@ export type ReceiptDTO = {
   cashReceived: number; change: number;
 };
 export type SettleInput = { kind: "cash"; received: number } | { kind: "qris" } | { kind: "split"; cash: number };
+
+/** Isi pesanan belum lunas untuk dipilih saat "bayar sebagian". */
+export type OrderLinesDTO = {
+  id: string; number: number; customerName: string;
+  discount: { mode: "rp" | "pct"; value: number };
+  lines: { id: string; name: string; options: string[]; note: string; price: number; optionsTotal: number; qty: number; discount: { mode: "rp" | "pct"; value: number } }[];
+};
+export type PartialResult = { ok: true; orderId: string; number: number; remaining: number } | { ok: false; error: string };
+export type AddItemsResult = { ok: true; number: number; total: number } | { ok: false; error: string };

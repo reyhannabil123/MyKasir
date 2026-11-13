@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { createOrder } from "@/app/actions/orders";
+import { addItemsToOrder, createOrder } from "@/app/actions/orders";
 import { calcOrder, lineCalc, NO_DISCOUNT, type Discount } from "@/lib/calc";
 import { isAvailable } from "@/lib/menu";
 import { rupiah } from "@/lib/time";
@@ -19,7 +19,10 @@ type ItemModalState = null | { mode: "add"; item: MenuItemDTO } | { mode: "edit"
 let seq = 0;
 const TYPES: OrderType[] = ["Makan di tempat", "Bawa pulang", "Ojol"];
 
-export function OrderScreen({ data, qrisUrl, nextNumber }: { data: MenuData; qrisUrl: string | null; nextNumber: number }) {
+/** `append`: mode menambah menu ke pesanan Bayar nanti yang sudah ada. */
+export type AppendTarget = { id: string; number: number; customerName: string; total: number };
+
+export function OrderScreen({ data, qrisUrl, nextNumber, append }: { data: MenuData; qrisUrl: string | null; nextNumber: number; append?: AppendTarget }) {
   const { categories, groups, items } = data;
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("all");
@@ -35,6 +38,8 @@ export function OrderScreen({ data, qrisUrl, nextNumber }: { data: MenuData; qri
   const [done, setDone] = useState<Extract<CreateOrderResult, { ok: true }>["order"] | null>(null);
   const [receiptId, setReceiptId] = useState<string | null>(null);
   const [toast, setToast] = useState("");
+  const [added, setAdded] = useState<{ number: number; total: number } | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const itemById = (id: string) => items.find((m) => m.id === id)!;
   const flash = (m: string) => { setToast(m); setTimeout(() => setToast(""), 2800); };
@@ -85,13 +90,22 @@ export function OrderScreen({ data, qrisUrl, nextNumber }: { data: MenuData; qri
     return null;
   }
 
+  async function submitAppend() {
+    if (!append || saving) return;
+    setSaving(true);
+    const r = await addItemsToOrder(append.id, lines.map((l) => ({ menuItemId: l.menuItemId, qty: l.qty, note: l.note, optionIds: l.options.map((o) => o.id), discount: l.discount })));
+    setSaving(false);
+    if (!r.ok) return flash(r.error);
+    setCartOpen(false); setAdded({ number: r.number, total: r.total }); setLines([]);
+  }
+
   const editLine = modal?.mode === "edit" ? lines[modal.idx] : undefined;
   const modalItem = modal?.mode === "add" ? modal.item : editLine ? itemById(editLine.menuItemId) : undefined;
 
   const cart = (
     <aside className={`cart ${cartOpen ? "open" : ""}`} aria-label="Keranjang pesanan">
       <div className="chead">
-        <h2>Pesanan #{String(nextNumber).padStart(3, "0")}</h2>
+        <h2>{append ? `Tambahan #${String(append.number).padStart(3, "0")}` : `Pesanan #${String(nextNumber).padStart(3, "0")}`}</h2>
         <div className="row">
           {count > 0 && <button className="btn sm ghost" onClick={reset}>Kosongkan</button>}
           <button className="icon-btn closecart" onClick={() => setCartOpen(false)} aria-label="Tutup"><Icon n="x" /></button>
@@ -121,25 +135,31 @@ export function OrderScreen({ data, qrisUrl, nextNumber }: { data: MenuData; qri
             </div>
           );
         })}
-        <label className="f"><span>Atas nama <small>(opsional)</small></span>
-          <input className="in" value={name} onChange={(e) => setName(e.target.value)} placeholder="Contoh: Bu Rina" maxLength={60} autoComplete="off" /></label>
-        <div className="stack">
+        {append && <p className="hint">Ditambahkan ke pesanan #{String(append.number).padStart(3, "0")}{append.customerName ? ` · ${append.customerName}` : ""} (sekarang {rupiah(append.total)}).</p>}
+        {!append && <label className="f"><span>Atas nama <small>(opsional)</small></span>
+          <input className="in" value={name} onChange={(e) => setName(e.target.value)} placeholder="Contoh: Bu Rina" maxLength={60} autoComplete="off" /></label>}
+        {!append && <div className="stack">
           <div className="seg full">{TYPES.map((t) => <button key={t} className={type === t ? "on" : ""} onClick={() => setType(t)}>{t}</button>)}</div>
           {type === "Makan di tempat" && (
             <label className="f"><span>No. meja <small>(opsional)</small></span>
               <input className="in" value={table} onChange={(e) => setTable(e.target.value)} placeholder="Contoh: 4" maxLength={20} autoComplete="off" /></label>
           )}
-        </div>
+        </div>}
       </div>
       <div className="cfoot">
         <div className="totals">
           <div className="kv"><span className="muted">Subtotal</span><span className="num">{rupiah(calc.subtotal)}</span></div>
           {calc.itemDiscount > 0 && <div className="kv"><span className="muted">Diskon item</span><span className="num">-{rupiah(calc.itemDiscount)}</span></div>}
-          <DiscountInput key={discKey} value={orderDisc} onChange={setOrderDisc} placeholder="Diskon pesanan" />
-          {calc.orderDiscount > 0 && <div className="kv"><span className="muted">Potongan</span><span className="num">-{rupiah(calc.orderDiscount)}</span></div>}
-          <div className="kv"><span>Total</span><span className="big num">{rupiah(calc.total)}</span></div>
+          {!append && <DiscountInput key={discKey} value={orderDisc} onChange={setOrderDisc} placeholder="Diskon pesanan" />}
+          {!append && calc.orderDiscount > 0 && <div className="kv"><span className="muted">Potongan</span><span className="num">-{rupiah(calc.orderDiscount)}</span></div>}
+          <div className="kv"><span>{append ? "Total tambahan" : "Total"}</span><span className="big num">{rupiah(calc.total)}</span></div>
+          {append && <p className="hint">Total akhir pesanan dihitung ulang, termasuk diskon pesanan yang sudah ada.</p>}
         </div>
-        <button className="btn block" disabled={!count} onClick={() => { setCartOpen(false); setPaying(true); }}>{count ? `Bayar ${rupiah(calc.total)}` : "Bayar"}</button>
+        {append ? (
+          <button className="btn block" disabled={!count || saving} onClick={submitAppend}>{saving ? "Menyimpan…" : count ? `Simpan tambahan ${rupiah(calc.total)}` : "Simpan tambahan"}</button>
+        ) : (
+          <button className="btn block" disabled={!count} onClick={() => { setCartOpen(false); setPaying(true); }}>{count ? `Bayar ${rupiah(calc.total)}` : "Bayar"}</button>
+        )}
       </div>
     </aside>
   );
@@ -148,8 +168,8 @@ export function OrderScreen({ data, qrisUrl, nextNumber }: { data: MenuData; qri
     <div className="order">
       <section>
         <div className="menuhead">
-          <Link className="icon-btn" href="/" aria-label="Kembali"><Icon n="back" /></Link>
-          <h1 style={{ fontSize: 22 }}>Pesanan baru</h1>
+          <Link className="icon-btn" href={append ? "/bayar-nanti" : "/"} aria-label="Kembali"><Icon n="back" /></Link>
+          <h1 style={{ fontSize: 22 }}>{append ? `Tambah ke #${String(append.number).padStart(3, "0")}${append.customerName ? ` · ${append.customerName}` : ""}` : "Pesanan baru"}</h1>
         </div>
         <div className="search"><Icon n="search" /><input className="in" placeholder="Cari menu" value={q} onChange={(e) => setQ(e.target.value)} autoComplete="off" /></div>
         <div className="chips" style={{ marginTop: 12 }}>
@@ -206,6 +226,16 @@ export function OrderScreen({ data, qrisUrl, nextNumber }: { data: MenuData; qri
           </div>
           <button className="btn ghost block" onClick={() => { setReceiptId(done.id); setDone(null); }}>Lihat dan cetak struk</button>
           <button className="btn block" onClick={() => setDone(null)}>Pesanan baru</button>
+        </Modal>
+      )}
+      {added && append && (
+        <Modal title="Tambahan tersimpan" onClose={() => setAdded(null)}>
+          <div className="stack">
+            <div className="kv"><span className="muted">Pesanan</span><b className="num">#{String(added.number).padStart(3, "0")}{append.customerName ? ` · ${append.customerName}` : ""}</b></div>
+            <div className="kv"><span className="muted">Total sekarang (belum lunas)</span><b className="num">{rupiah(added.total)}</b></div>
+          </div>
+          <button className="btn ghost block" onClick={() => { setReceiptId(append.id); setAdded(null); }}>Lihat struk</button>
+          <Link className="btn block" href="/bayar-nanti">Kembali ke Bayar nanti</Link>
         </Modal>
       )}
       {receiptId && <ReceiptModal orderId={receiptId} onClose={() => setReceiptId(null)} />}

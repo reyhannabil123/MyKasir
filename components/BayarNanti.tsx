@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { settleOrder } from "@/app/actions/orders";
 import { pad, fmtWhen } from "@/lib/format";
 import { rupiah } from "@/lib/time";
@@ -9,6 +10,7 @@ import { Icon } from "./Icon";
 import { OrderRow, methodLabel } from "./OrderList";
 import { PayModal } from "./PayModal";
 import { ReceiptModal } from "./ReceiptModal";
+import { SplitPay } from "./SplitPay";
 
 type St = "unpaid" | "paid" | "all";
 type Sort = "new" | "old" | "name" | "amt";
@@ -19,6 +21,8 @@ export function BayarNanti({ orders, qrisUrl }: { orders: OrderRowDTO[]; qrisUrl
   const [q, setQ] = useState("");
   const [receipt, setReceipt] = useState<string | null>(null);
   const [settling, setSettling] = useState<OrderRowDTO | null>(null);
+  const [splitting, setSplitting] = useState<OrderRowDTO | null>(null);
+  const [toast, setToast] = useState("");
 
   const unpaid = orders.filter((o) => o.status === "unpaid");
   const list = useMemo(() => {
@@ -62,7 +66,11 @@ export function BayarNanti({ orders, qrisUrl }: { orders: OrderRowDTO[]; qrisUrl
         {list.map((o) => (
           <OrderRow key={o.id} o={o} onOpen={() => setReceipt(o.id)}
             extra={o.status === "unpaid" ? (
-              <div className="orow-act"><button className="btn sm" onClick={() => setSettling(o)}><Icon n="check" s={16} /> Tandai lunas</button></div>
+              <div className="orow-act">
+                <button className="btn sm" onClick={() => setSettling(o)}><Icon n="check" s={16} /> Tandai lunas</button>
+                <button className="btn sm outl" onClick={() => setSplitting(o)}>Bayar sebagian</button>
+                <Link className="btn sm outl" href={`/pesanan?tambah=${o.id}`}><Icon n="plus" s={16} /> Tambah pesanan</Link>
+              </div>
             ) : (
               <div className="orow-act"><span className="muted small">Lunas {o.paidAt ? fmtWhen(o.paidAt) : ""} · {methodLabel(o)}</span></div>
             )} />
@@ -73,7 +81,16 @@ export function BayarNanti({ orders, qrisUrl }: { orders: OrderRowDTO[]; qrisUrl
         <PayModal title={`Pelunasan #${pad(settling.number)}${settling.customerName ? ` · ${settling.customerName}` : ""}`} total={settling.total}
           qrisUrl={qrisUrl} customerName="" allowLater={false} onClose={() => setSettling(null)} onSubmit={(p) => settle(p)} />
       )}
+      {splitting && (
+        <SplitPay orderId={splitting.id} qrisUrl={qrisUrl} onClose={() => setSplitting(null)}
+          onDone={(r) => {
+            setSplitting(null); setReceipt(r.orderId);
+            setToast(r.remaining > 0 ? `Sisa ${rupiah(r.remaining)} masih di Bayar nanti.` : "Pesanan lunas.");
+            setTimeout(() => setToast(""), 4000);
+          }} />
+      )}
       {receipt && <ReceiptModal orderId={receipt} onClose={() => setReceipt(null)} />}
+      {toast && <div className="toast" role="status">{toast}</div>}
     </div>
   );
 }
